@@ -4,8 +4,7 @@ services:
   backend:
     build: ./backend
     container_name: monitor-backend
-    ports:
-      - "5000:5000"  # 确保这行存在且正确
+    network_mode: "host"  # 关键修改：使用宿主机网络
     restart: unless-stopped
     volumes:
       - ./backend:/app
