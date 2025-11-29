@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    container_name: monitor-backend
+    ports:
+      - "5000:5000"  # 确保这行存在且正确
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+    environment:
+      - FLASK_ENV=development
+
+  frontend:
+    image: nginx:alpine
+    container_name: monitor-frontend
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+    ports:
+      - "8080:80"
+    restart: unless-stopped
