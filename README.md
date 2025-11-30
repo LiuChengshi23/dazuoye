@@ -72,10 +72,11 @@ project
     ├── js/                         # JavaScript文件目录
     │   ├── ui.js                   # UI工具库
     │   ├── api.js                  # API接口封装
-    │   └── charts.js               # 图表管理模块
-    │
-    └── static/                     # 静态资源目录
-        └── images/                  # 图片资源
+    │   └── charts.js              # 图表管理模块
+    │   └── i18n/                      
+    │    └── en.js
+    │    └── index.js
+    │    └── zh.js
 ```
 
 ------
@@ -326,4 +327,5 @@ docker stats
 
 1. **检查页面加载**：确保所有页面正常显示
 2. **验证API接口**：测试主机管理、数据查询等接口
+
 3. **检查数据库**：确认SQLite数据库正常创建
