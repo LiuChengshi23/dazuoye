@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>历史记录 - 服务器系统</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 统一深色表单样式 */
+        .form-group {
+            margin-bottom: 15px;
+            display: inline-block;
+            margin-right: 20px;
+            vertical-align: top;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #e0e1dd;
+            font-weight: 500;
+        }
+        .form-group input, .form-group select {
+            width: 200px;
+            padding: 10px 12px;
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 4px;
+            color: #f8fafc;
+            font-size: 14px;
+        }
+        .form-group input::placeholder {
+            color: #94a3b8;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #4cc9f0;
+            box-shadow: 0 0 0 2px rgba(76, 201, 240, 0.2);
+        }
+        .btn {
+            padding: 10px 16px;
+            border-radius: 4px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 24px;
+        }
+        .btn-primary {
+            background-color: #6366f1;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #4f46e5;
+        }
+        .btn-export {
+            background-color: #10b981;
+            color: white;
+            margin-left: 10px;
+        }
+        .btn-export:hover {
+            background-color: #059669;
+        }
+        .table-container {
+            margin-top: 20px;
+            overflow-x: auto; /* 横向滚动适配 */
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #778da9;
+        }
+        .loading-state {
+            text-align: center;
+            padding: 40px;
+        }
+        /* 告警样式 */
+        .alert-red {
+            color: #ef4444; /* 红色告警色 */
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1 data-i18n="sidebar.system">服务器系统</h1>
+        </div>
+        <div class="sidebar-nav">
+            <a href="index.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-server"></i>
+                    <span data-i18n="sidebar.server_monitor">服务器监控</span>
+                </div>
+            </a>
+            <a href="dashboard.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-chart-pie"></i>
+                    <span data-i18n="sidebar.dashboard">监控大屏</span>
+                </div>
+            </a>
+            <a href="history.html" class="sidebar-nav-link">
+                <div class="sidebar-item active">
+                    <i class="fas fa-history"></i>
+                    <span data-i18n="sidebar.history">历史记录</span>
+                </div>
+            </a>
+            <a href="settings.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-cog"></i>
+                    <span data-i18n="sidebar.settings">系统设置</span>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="content-header">
+            <h2 data-i18n="history.title">📊 历史记录</h2>
+            <p class="subtitle" data-i18n="history.subtitle">查看和导出服务器监控历史数据</p>
+        </div>
+
+        <div class="card">
+            <h3 data-i18n="history.query_conditions">查询条件</h3>
+            <div class="query-form">
+                <div class="form-group">
+                    <label for="hostIp" data-i18n="history.host_ip">主机IP</label>
+                    <select id="hostIp">
+                        <option value="all" data-i18n="history.all_hosts">所有主机</option>
+                        <!-- 后端渲染主机IP选项 -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="timeRange" data-i18n="history.time_range">时间范围</label>
+                    <select id="timeRange">
+                        <option value="1h" data-i18n="history.last_1h">近1小时</option>
+                        <option value="6h" data-i18n="history.last_6h">近6小时</option>
+                        <option value="12h" data-i18n="history.last_12h">近12小时</option>
+                        <option value="24h" data-i18n="history.last_24h">近24小时</option>
+                        <option value="custom" data-i18n="history.custom">自定义</option>
+                    </select>
+                </div>
+                <div class="form-group" id="customTime" style="display: none;">
+                    <label for="startTime" data-i18n="history.start_time">开始时间</label>
+                    <input type="datetime-local" id="startTime">
+                </div>
+                <div class="form-group" id="customEndTime" style="display: none;">
+                    <label for="endTime" data-i18n="history.end_time">结束时间</label>
+                    <input type="datetime-local" id="endTime">
+                </div>
+                <button class="btn btn-primary" onclick="queryHistory()" data-i18n="history.query">查询</button>
+                <button class="btn btn-export" onclick="exportHistory()" data-i18n="history.export_csv">导出CSV</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 data-i18n="history.data_list">历史数据列表</h3>
+            <div class="table-container">
+                <div id="loading" class="loading-state">
+                    <div class="loading" style="margin: 0 auto;"></div>
+                    <p style="margin-top: 15px; color: #778da9;" data-i18n="host_management.loading">加载中...</p>
+                </div>
+                <div id="empty" class="empty-state" style="display: none;">
+                    <p data-i18n="history.no_data">暂无匹配的历史数据</p>
+                </div>
+                <table id="historyTable" class="table" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th data-i18n="table.record_time">记录时间</th>
+                            <th data-i18n="table.ip">主机IP</th>
+                            <th data-i18n="table.username">用户名</th>
+                            <th data-i18n="table.cpu_usage">CPU使用率</th>
+                            <th data-i18n="table.memory_usage">内存使用率</th>
+                            <th data-i18n="table.disk_usage">磁盘使用率</th>
+                            <th data-i18n="table.status">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <!-- 历史数据行 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加语言包引用 -->
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/index.js"></script>
+
+    <script src="js/ui.js"></script>
+    <script>
+        const API_BASE = 'http://192.168.80.131:5000/api';
+        let cpuThreshold = 80; // 默认告警阈值
+        let memThreshold = 80;
+
+        // 页面加载初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化国际化
+            if (window.i18nManager) {
+                window.i18nManager.applyLanguage();
+            }
+            loadSidebar();
+            loadHostIpOptions(); // 加载主机IP下拉选项
+            loadAlertThresholds(); // 加载告警阈值
+            queryHistory(); // 默认查询近1小时数据
+        });
+
+        // 加载告警阈值
+        async function loadAlertThresholds() {
+            try {
+                const resp = await fetch(`${API_BASE}/settings`);
+                const settings = await resp.json();
+                cpuThreshold = settings.cpu_threshold;
+                memThreshold = settings.mem_threshold;
+            } catch (error) {
+                console.error('加载告警阈值失败:', error);
+            }
+        }
+
+        // 加载主机IP下拉选项
+        async function loadHostIpOptions() {
+            try {
+                const response = await fetch(`${API_BASE}/hosts`);
+                if (!response.ok) throw new Error('获取主机列表失败');
+                const hosts = await response.json();
+                const hostIpSelect = document.getElementById('hostIp');
+                
+                hosts.forEach(host => {
+                    const option = document.createElement('option');
+                    option.value = host.ip;
+                    option.textContent = host.ip;
+                    hostIpSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('加载主机IP失败:', error);
+                showMessage('加载主机列表失败', 'error');
+            }
+        }
+
+        // 时间范围切换（显示/隐藏自定义时间）
+        document.getElementById('timeRange').addEventListener('change', function() {
+            const customTime = document.getElementById('customTime');
+            const customEndTime = document.getElementById('customEndTime');
+            if (this.value === 'custom') {
+                customTime.style.display = 'inline-block';
+                customEndTime.style.display = 'inline-block';
+                // 默认填充当前时间前后1小时（适配datetime-local格式）
+                const now = new Date();
+                const startTime = new Date(now.getTime() - 3600 * 1000);
+                document.getElementById('startTime').value = formatToLocalDateTime(startTime);
+                document.getElementById('endTime').value = formatToLocalDateTime(now);
+            } else {
+                customTime.style.display = 'none';
+                customEndTime.style.display = 'none';
+            }
+        });
+
+        // 格式化日期为 datetime-local 组件所需格式（YYYY-MM-DDTHH:MM）
+        function formatToLocalDateTime(date) {
+            return date.toISOString().slice(0, 16);
+        }
+
+        // 格式化日期为后端查询所需格式（YYYY-MM-DD HH:MM:SS）- 基于本地时间（与服务器时区一致）
+        function formatToBackendDateTime(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hour = String(date.getHours()).padStart(2, '0');
+            const minute = String(date.getMinutes()).padStart(2, '0');
+            const second = String(date.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        }
+
+        // 查询历史数据
+        async function queryHistory() {
+            const hostIp = document.getElementById('hostIp').value;
+            const timeRange = document.getElementById('timeRange').value;
+            let startTime = '';
+            let endTime = '';
+            const now = new Date(); // 当前本地时间（与服务器时区一致）
+
+            // 处理时间范围 - 优化相对时间计算逻辑
+            if (timeRange === 'custom') {
+                // 获取自定义时间并转换为后端格式
+                const localStartTime = document.getElementById('startTime').value;
+                const localEndTime = document.getElementById('endTime').value;
+                if (!localStartTime || !localEndTime) {
+                    const message = window.i18nManager ? 
+                        window.i18nManager.t('history.custom_time_required') : 
+                        '请选择自定义时间范围';
+                    showMessage(message, 'warning');
+                    return;
+                }
+                // 将 YYYY-MM-DDTHH:MM 转换为 YYYY-MM-DD HH:MM:SS
+                startTime = localStartTime.replace('T', ' ') + ':00';
+                endTime = localEndTime.replace('T', ' ') + ':00';
+            } else {
+                // 计算相对时间（基于本地时间直接减去小时数，避免时区偏差）
+                const hours = parseInt(timeRange.replace('h', ''));
+                const startDate = new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate(),
+                    now.getHours() - hours, // 直接减去小时数
+                    now.getMinutes(),
+                    now.getSeconds()
+                );
+                // 格式化为后端兼容格式
+                endTime = formatToBackendDateTime(now);
+                startTime = formatToBackendDateTime(startDate);
+            }
+
+            // 调试用：查看传递给后端的时间（可删除）
+            console.log('查询时间范围：', startTime, '至', endTime);
+
+            // 显示加载状态
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('empty').style.display = 'none';
+            document.getElementById('historyTable').style.display = 'none';
+
+            try {
+                // 构造查询参数
+                const params = new URLSearchParams({
+                    host_ip: hostIp,
+                    start_time: startTime,
+                    end_time: endTime
+                });
+                const response = await fetch(`${API_BASE}/history?${params}`);
+                if (!response.ok) throw new Error('查询历史数据失败');
+                const historyData = await response.json();
+
+                if (historyData.length === 0) {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('empty').style.display = 'block';
+                    return;
+                }
+
+                // 渲染表格数据
+                const tableBody = document.getElementById('historyTableBody');
+                tableBody.innerHTML = '';
+                historyData.forEach(item => {
+                    const cpu = parseFloat(item.cpu.replace('%', ''));
+                    const mem = parseFloat(item.mem.replace('%', ''));
+                    const cpuAlert = cpu > cpuThreshold;
+                    const memAlert = mem > memThreshold;
+                    const isOnline = cpu > 0 || mem > 0;
+                    const statusClass = isOnline ? 'status-online' : 'status-offline';
+                    const statusText = isOnline ? 
+                        (window.i18nManager ? window.i18nManager.t('status.online') : '在线') : 
+                        (window.i18nManager ? window.i18nManager.t('status.offline') : '离线');
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${item.record_time}</td>
+                        <td>${item.ip}</td>
+                        <td>${item.username}</td>
+                        <td class="${cpuAlert ? 'alert-red' : ''}">${item.cpu}</td>
+                        <td class="${memAlert ? 'alert-red' : ''}">${item.mem}</td>
+                        <td>${item.disk || '0.0%'}</td>
+                        <td class="${statusClass}">${statusText}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+
+                // 显示表格
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('historyTable').style.display = 'table';
+            } catch (error) {
+                console.error('查询历史数据失败:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('empty').style.display = 'block';
+                document.getElementById('empty').innerHTML = `<p>❌ 查询失败：${error.message}</p>`;
+            }
+        }
+
+        // 导出历史数据为CSV
+        async function exportHistory() {
+            const hostIp = document.getElementById('hostIp').value;
+            const timeRange = document.getElementById('timeRange').value;
+            let startTime = '';
+            let endTime = '';
+            const now = new Date();
+
+            // 处理时间范围（和查询逻辑一致）
+            if (timeRange === 'custom') {
+                const localStartTime = document.getElementById('startTime').value;
+                const localEndTime = document.getElementById('endTime').value;
+                if (!localStartTime || !localEndTime) {
+                    const message = window.i18nManager ? 
+                        window.i18nManager.t('history.custom_time_required') : 
+                        '请选择自定义时间范围';
+                    showMessage(message, 'warning');
+                    return;
+                }
+                startTime = localStartTime.replace('T', ' ') + ':00';
+                endTime = localEndTime.replace('T', ' ') + ':00';
+            } else {
+                const hours = parseInt(timeRange.replace('h', ''));
+                const startDate = new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate(),
+                    now.getHours() - hours,
+                    now.getMinutes(),
+                    now.getSeconds()
+                );
+                endTime = formatToBackendDateTime(now);
+                startTime = formatToBackendDateTime(startDate);
+            }
+
+            try {
+                const params = new URLSearchParams({
+                    host_ip: hostIp,
+                    start_time: startTime,
+                    end_time: endTime,
+                    export: 'csv'
+                });
+                // 下载CSV文件
+                window.open(`${API_BASE}/history?${params}`, '_blank');
+                const successMessage = window.i18nManager ? 
+                    window.i18nManager.t('history.export_success') : 
+                    '导出成功，正在下载...';
+                showMessage(successMessage, 'success');
+            } catch (error) {
+                console.error('导出失败:', error);
+                showMessage('导出失败：' + error.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主机管理 - 服务器系统</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 统一深色表单样式 */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #e0e1dd; /* 浅色标签文字 */
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            background-color: #1e293b; /* 深色输入框 */
+            border: 1px solid #475569;
+            border-radius: 4px;
+            color: #f8fafc; /* 输入文字颜色 */
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-group input::placeholder {
+            color: #94a3b8; /* 占位符浅色 */
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #4cc9f0; /* 聚焦时亮蓝色边框 */
+            box-shadow: 0 0 0 2px rgba(76, 201, 240, 0.2);
+        }
+
+        /* 加载动画和数据更新样式 */
+        .inline-loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #4cc9f0;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: inline-spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+        @keyframes inline-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .table td {
+            transition: all 0.3s ease;
+        }
+        /* 数据更新闪烁动画 */
+        .data-update {
+            animation: flash 0.5s ease-out;
+        }
+        @keyframes flash {
+            0% { background-color: rgba(251, 191, 36, 0.2); }
+            100% { background-color: transparent; }
+        }
+        /* 按钮样式统一 */
+        .btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-primary {
+            background-color: #6366f1; /* 紫色添加按钮 */
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #4f46e5;
+        }
+        .btn-success {
+            background-color: #2563eb; /* 蓝色刷新按钮 */
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #1d4ed8;
+        }
+        .btn-danger {
+            background-color: #db2777; /* 粉色删除按钮 */
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #be185d;
+        }
+        /* 告警样式 */
+        .alert-red {
+            color: #ef4444; /* 红色告警色 */
+            font-weight: bold;
+        }
+        .fa-exclamation-triangle {
+            margin-left: 5px;
+            color: #f59e0b; /* 黄色警告图标 */
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1 data-i18n="sidebar.system">服务器系统</h1>
+        </div>
+        <div class="sidebar-nav">
+            <a href="index.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-server"></i>
+                    <span data-i18n="sidebar.server_monitor">服务器监控</span>
+                </div>
+            </a>
+            <a href="dashboard.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-chart-pie"></i>
+                    <span data-i18n="sidebar.dashboard">监控大屏</span>
+                </div>
+            </a>
+            <a href="index.html" class="sidebar-nav-link">
+                <div class="sidebar-item active">
+                    <i class="fas fa-desktop"></i>
+                    <span data-i18n="sidebar.host_management">主机管理</span>
+                </div>
+            </a>
+            <a href="history.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-history"></i>
+                    <span data-i18n="sidebar.history">历史记录</span>
+                </div>
+            </a>
+            <a href="settings.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-cog"></i>
+                    <span data-i18n="sidebar.settings">系统设置</span>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="content-header">
+            <h2 data-i18n="host_management.title">🖥️ 主机管理</h2>
+            <p class="subtitle" data-i18n="host_management.subtitle">添加和管理监控的服务器</p>
+        </div>
+
+        <!-- 添加主机表单（深色风格统一） -->
+        <div class="card">
+            <h3 data-i18n="host_management.add_host">添加主机</h3>
+            <form id="addHostForm" onsubmit="addHost(); return false;">
+                <div class="form-group">
+                    <label for="ipInput" data-i18n="host_management.ip_address">IP 地址</label>
+                    <input type="text" id="ipInput" name="ip" data-i18n-placeholder="host_management.ip_placeholder" placeholder="例如: 192.168.80.131" required>
+                </div>
+                <div class="form-group">
+                    <label for="usernameInput" data-i18n="host_management.username">用户名</label>
+                    <input type="text" id="usernameInput" name="username" data-i18n-placeholder="host_management.username_placeholder" placeholder="例如: root" required>
+                </div>
+                <div class="form-group">
+                    <label for="passwordInput" data-i18n="host_management.password">密码</label>
+                    <input type="password" id="passwordInput" name="password" data-i18n-placeholder="host_management.password_placeholder" placeholder="请输入SSH密码" required>
+                </div>
+                <div class="form-group">
+                    <label for="portInput" data-i18n="host_management.ssh_port">SSH端口（默认22）</label>
+                    <input type="number" id="portInput" name="port" placeholder="22" min="1" max="65535" value="22">
+                </div>
+                <button type="submit" class="btn btn-primary" data-i18n="host_management.add_host_btn">添加主机</button>
+            </form>
+        </div>
+
+        <!-- 主机列表（数据实时更新，仅使用率闪烁） -->
+        <div class="card">
+            <h3 data-i18n="host_management.host_list">主机列表</h3>
+            <div style="margin-bottom: 15px;">
+                <button class="btn btn-success" onclick="loadHosts()" id="refreshBtn">
+                    <i class="fas fa-sync-alt"></i> <span data-i18n="host_management.refresh_data">刷新数据</span>
+                </button>
+            </div>
+            <!-- 容器结构 -->
+            <div id="hostsListContainer">
+                <div id="initialLoading" style="text-align: center; padding: 40px; display: block;">
+                    <div class="loading" style="margin: 0 auto;"></div>
+                    <p style="margin-top: 15px; color: #778da9;" data-i18n="host_management.loading">加载中...</p>
+                </div>
+                <div id="emptyContainer" style="text-align: center; padding: 40px; color: #778da9; display: none;">
+                    <p data-i18n="host_management.no_hosts">暂无已添加的主机，请点击上方「添加主机」按钮</p>
+                </div>
+                <div id="tableContainer" style="display: none;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="table.ip">IP地址</th>
+                                <th data-i18n="table.username">用户名</th>
+                                <th data-i18n="table.ssh_port">SSH端口</th>
+                                <th data-i18n="table.cpu_usage">CPU使用率</th>
+                                <th data-i18n="table.memory_usage">内存使用率</th>
+                                <th data-i18n="table.operations">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hostsTableBody">
+                            <!-- 数据行动态更新 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="errorContainer" style="display: none;" class="alert alert-danger"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加语言包引用 -->
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/index.js"></script>
+    
+    <script src="js/ui.js"></script>
+    <script>
+        const API_BASE = 'http://192.168.80.131:5000/api';
+
+        // 页面加载完成后自动加载主机列表，并启动定时刷新
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化国际化
+            if (window.i18nManager) {
+                window.i18nManager.applyLanguage();
+            }
+            loadHosts();
+            // 每5秒自动刷新一次数据
+            setInterval(loadHosts, 5000);
+        });
+
+        /**
+         * 加载/刷新主机列表（仅更新变化的使用率数据，添加闪烁动画）
+         */
+        async function loadHosts() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const initialLoading = document.getElementById('initialLoading');
+            const emptyContainer = document.getElementById('emptyContainer');
+            const tableContainer = document.getElementById('tableContainer');
+            const tableBody = document.getElementById('hostsTableBody');
+            const errorContainer = document.getElementById('errorContainer');
+
+            // 刷新按钮状态处理
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<div class="inline-loading"></div> <span data-i18n="host_management.refreshing">刷新中...</span>';
+
+            // 隐藏所有状态容器
+            initialLoading.style.display = 'none';
+            emptyContainer.style.display = 'none';
+            errorContainer.style.display = 'none';
+
+            try {
+                // 获取最新主机数据和告警阈值
+                const [hostsResp, settingsResp] = await Promise.all([
+                    fetch(`${API_BASE}/hosts`),
+                    fetch(`${API_BASE}/settings`)
+                ]);
+                if (!hostsResp.ok) throw new Error('获取主机列表失败');
+                const hosts = await hostsResp.json();
+                const settings = await settingsResp.json();
+                const cpuThreshold = settings.cpu_threshold;
+                const memThreshold = settings.mem_threshold;
+
+                if (hosts.length === 0) {
+                    // 无数据：显示空状态
+                    emptyContainer.style.display = 'block';
+                    tableContainer.style.display = 'none';
+                } else {
+                    // 有数据：显示表格
+                    tableContainer.style.display = 'block';
+                    emptyContainer.style.display = 'none';
+
+                    // 构建主机IP映射（用于快速查询）
+                    const hostIpMap = new Map(hosts.map(host => [host.ip, host]));
+                    const existingRows = tableBody.querySelectorAll('tr');
+                    const existingIps = new Set();
+
+                    // 1. 更新已有主机行（仅CPU和内存使用率）
+                    existingRows.forEach(row => {
+                        const ip = row.cells[0].textContent.trim();
+                        const host = hostIpMap.get(ip);
+                        if (host) {
+                            existingIps.add(ip);
+
+                            // 解析使用率数值
+                            const cpu = parseFloat(host.cpu.replace('%', ''));
+                            const mem = parseFloat(host.mem.replace('%', ''));
+                            const cpuAlert = cpu > cpuThreshold;
+                            const memAlert = mem > memThreshold;
+
+                            // 更新CPU使用率（变化时添加闪烁+告警标红）
+                            const cpuCell = row.cells[3];
+                            if (cpuCell.textContent !== host.cpu) {
+                                cpuCell.textContent = host.cpu;
+                                cpuCell.className = cpuAlert ? 'alert-red' : '';
+                                cpuCell.innerHTML = `${host.cpu} ${cpuAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}`;
+                                cpuCell.classList.add('data-update');
+                                setTimeout(() => cpuCell.classList.remove('data-update'), 500);
+                            } else {
+                                // 数据未变但需更新告警状态
+                                cpuCell.className = cpuAlert ? 'alert-red' : '';
+                                cpuCell.innerHTML = `${host.cpu} ${cpuAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}`;
+                            }
+
+                            // 更新内存使用率（变化时添加闪烁+告警标红）
+                            const memCell = row.cells[4];
+                            if (memCell.textContent !== host.mem) {
+                                memCell.textContent = host.mem;
+                                memCell.className = memAlert ? 'alert-red' : '';
+                                memCell.innerHTML = `${host.mem} ${memAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}`;
+                                memCell.classList.add('data-update');
+                                setTimeout(() => memCell.classList.remove('data-update'), 500);
+                            } else {
+                                // 数据未变但需更新告警状态
+                                memCell.className = memAlert ? 'alert-red' : '';
+                                memCell.innerHTML = `${host.mem} ${memAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}`;
+                            }
+                        }
+                    });
+
+                    // 2. 添加新主机行（首次出现的主机）
+                    hosts.forEach(host => {
+                        if (!existingIps.has(host.ip)) {
+                            const cpu = parseFloat(host.cpu.replace('%', ''));
+                            const mem = parseFloat(host.mem.replace('%', ''));
+                            const cpuAlert = cpu > cpuThreshold;
+                            const memAlert = mem > memThreshold;
+
+                            const newRow = document.createElement('tr');
+                            newRow.innerHTML = `
+                                <td>${host.ip}</td>
+                                <td>${host.username}</td>
+                                <td>${host.port || 22}</td>
+                                <td class="${cpuAlert ? 'alert-red' : ''}">
+                                    ${host.cpu} ${cpuAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}
+                                </td>
+                                <td class="${memAlert ? 'alert-red' : ''}">
+                                    ${host.mem} ${memAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}
+                                </td>
+                                <td>
+                                    <button class="btn btn-danger" onclick="deleteHost('${host.ip}')" data-i18n="host_management.delete">
+                                        删除
+                                    </button>
+                                </td>
+                            `;
+                            tableBody.appendChild(newRow);
+                        }
+                    });
+
+                    // 3. 移除已删除的主机行
+                    existingRows.forEach(row => {
+                        const ip = row.cells[0].textContent.trim();
+                        if (!hostIpMap.has(ip)) {
+                            row.remove();
+                        }
+                    });
+                }
+
+            } catch (error) {
+                console.error('加载主机列表失败:', error);
+                errorContainer.style.display = 'block';
+                errorContainer.innerHTML = `❌ 加载失败：${error.message}`;
+                // 保留已有表格
+                if (tableBody.querySelectorAll('tr').length > 0) {
+                    tableContainer.style.display = 'block';
+                }
+            } finally {
+                // 恢复刷新按钮状态
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> <span data-i18n="host_management.refresh_data">刷新数据</span>';
+                
+                // 重新应用语言（确保动态内容也被翻译）
+                if (window.i18nManager) {
+                    window.i18nManager.applyLanguage();
+                }
+            }
+        }
+
+        /**
+         * 删除主机功能
+         */
+        async function deleteHost(ip) {
+            const confirmMessage = window.i18nManager ? 
+                window.i18nManager.t('host_management.delete_confirm', {ip: ip}) : 
+                `确定要删除主机 ${ip} 吗？`;
+            
+            if (!confirm(confirmMessage)) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/delete_host/${ip}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+                if (response.ok && result.status === 'success') {
+                    const successMessage = window.i18nManager ? 
+                        window.i18nManager.t('host_management.delete_success', {ip: ip}) : 
+                        `✅ 主机 ${ip} 删除成功！`;
+                    showMessage(successMessage, 'success');
+                    loadHosts(); // 刷新列表
+                } else {
+                    showMessage(`❌ 删除失败：${result.message}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('删除报错：', error);
+                showMessage('❌ 删除失败：网络异常或后端服务未运行', 'error');
+            }
+        }
+
+        /**
+         * 添加主机功能
+         */
+        async function addHost() {
+            const ip = document.getElementById('ipInput').value.trim();
+            const username = document.getElementById('usernameInput').value.trim();
+            const password = document.getElementById('passwordInput').value.trim();
+            const port = document.getElementById('portInput').value.trim() || 22;
+
+            // 表单验证
+            if (!isValidIp(ip)) {
+                const message = window.i18nManager ? 
+                    window.i18nManager.t('message.invalid_ip') : 
+                    '请输入合法的IP地址！';
+                showMessage(message, 'warning');
+                return;
+            }
+            if (!username) {
+                const message = window.i18nManager ? 
+                    window.i18nManager.t('message.empty_username') : 
+                    '用户名不能为空！';
+                showMessage(message, 'warning');
+                return;
+            }
+            if (!password) {
+                const message = window.i18nManager ? 
+                    window.i18nManager.t('message.empty_password') : 
+                    '密码不能为空！';
+                showMessage(message, 'warning');
+                return;
+            }
+            if (!isValidPort(port)) {
+                const message = window.i18nManager ? 
+                    window.i18nManager.t('message.invalid_port') : 
+                    '请输入合法的端口号（1-65535）！';
+                showMessage(message, 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/add_host`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `ip=${encodeURIComponent(ip)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&port=${port}`
+                });
+
+                const result = await response.json();
+                if (response.ok && result.status === 'success') {
+                    const successMessage = window.i18nManager ? 
+                        window.i18nManager.t('host_management.add_success', {ip: ip}) : 
+                        `✅ 主机 ${ip} 添加成功！`;
+                    showMessage(successMessage, 'success');
+                    // 清空表单
+                    document.getElementById('addHostForm').reset();
+                    loadHosts(); // 刷新列表
+                } else {
+                    showMessage(`❌ 添加失败：${result.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('添加报错：', error);
+                showMessage('❌ 添加失败：网络异常', 'error');
+            }
+        }
+
+        // 辅助函数：IP验证（原有逻辑，确保表单验证正常）
+        function isValidIp(ip) {
+            const ipRegex = /^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+            return ipRegex.test(ip);
+        }
+
+        // 辅助函数：端口验证（原有逻辑）
+        function isValidPort(port) {
+            const portNum = parseInt(port);
+            return !isNaN(portNum) && portNum >= 1 && portNum <= 65535;
+        }
+    </script>
+</body>
+</html>

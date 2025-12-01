@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统设置 - 服务器系统</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 统一深色表单样式 */
+        .settings-card {
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #e0e1dd;
+            font-weight: 500;
+        }
+        .form-group input, .form-group select, .form-group range {
+            width: 300px;
+            padding: 10px 12px;
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 4px;
+            color: #f8fafc;
+            font-size: 14px;
+        }
+        .form-group input::placeholder {
+            color: #94a3b8;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #4cc9f0;
+            box-shadow: 0 0 0 2px rgba(76, 201, 240, 0.2);
+        }
+        .range-group {
+            display: flex;
+            align-items: center;
+        }
+        .range-group input[type="range"] {
+            flex: 1;
+            margin-right: 15px;
+        }
+        .range-value {
+            color: #4cc9f0;
+            font-weight: 500;
+        }
+        .btn-save {
+            padding: 10px 20px;
+            background-color: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-save:hover {
+            background-color: #4f46e5;
+        }
+        .alert-success {
+            background-color: rgba(16, 185, 129, 0.2);
+            color: #4ade80;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1 data-i18n="sidebar.system">服务器系统</h1>
+        </div>
+        <div class="sidebar-nav">
+            <a href="index.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-server"></i>
+                    <span data-i18n="sidebar.server_monitor">服务器监控</span>
+                </div>
+            </a>
+            <a href="dashboard.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-chart-pie"></i>
+                    <span data-i18n="sidebar.dashboard">监控大屏</span>
+                </div>
+            </a>
+            <a href="history.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-history"></i>
+                    <span data-i18n="sidebar.history">历史记录</span>
+                </div>
+            </a>
+            <a href="settings.html" class="sidebar-nav-link">
+                <div class="sidebar-item active">
+                    <i class="fas fa-cog"></i>
+                    <span data-i18n="sidebar.settings">系统设置</span>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="content-header">
+            <h2 data-i18n="settings.title">⚙️ 系统设置</h2>
+            <p class="subtitle" data-i18n="settings.subtitle">配置系统参数和监控选项</p>
+        </div>
+
+        <div id="saveSuccess" class="alert-success">
+            <i class="fas fa-check"></i> <span data-i18n="settings.save_success">保存成功！</span>
+        </div>
+
+        <!-- 监控配置 -->
+        <div class="card settings-card">
+            <h3 data-i18n="settings.monitor_config">监控配置</h3>
+            <div class="form-group">
+                <label for="refreshInterval" data-i18n="settings.refresh_interval">自动刷新频率（秒）</label>
+                <div class="range-group">
+                    <input type="range" id="refreshInterval" min="3" max="30" step="1" value="5">
+                    <span class="range-value" id="refreshIntervalValue">5</span> <span data-i18n="settings.unit_seconds">秒</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="cpuThreshold" data-i18n="settings.cpu_threshold">CPU告警阈值（%）</label>
+                <div class="range-group">
+                    <input type="range" id="cpuThreshold" min="30" max="90" step="5" value="80">
+                    <span class="range-value" id="cpuThresholdValue">80</span>%
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="memThreshold" data-i18n="settings.memory_threshold">内存告警阈值（%）</label>
+                <div class="range-group">
+                    <input type="range" id="memThreshold" min="30" max="90" step="5" value="80">
+                    <span class="range-value" id="memThresholdValue">80</span>%
+                </div>
+            </div>
+        </div>
+
+        <!-- 系统参数 -->
+        <div class="card settings-card">
+            <h3 data-i18n="settings.system_params">系统参数</h3>
+            <div class="form-group">
+                <label for="theme" data-i18n="settings.theme_switch">主题切换</label>
+                <select id="theme">
+                    <option value="dark" data-i18n="settings.dark_theme">深色主题（默认）</option>
+                    <option value="light" data-i18n="settings.light_theme">浅色主题</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="dataRetention" data-i18n="settings.data_retention">数据保留天数</label>
+                <select id="dataRetention">
+                    <option value="7" data-i18n="settings.7_days">7天（默认）</option>
+                    <option value="15" data-i18n="settings.15_days">15天</option>
+                    <option value="30" data-i18n="settings.30_days">30天</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn-save" onclick="saveSettings()" data-i18n="settings.save_settings">保存设置</button>
+    </div>
+
+    <!-- 添加语言包引用 -->
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/index.js"></script>
+
+    <script src="js/ui.js"></script>
+    <script>
+        const API_BASE = 'http://192.168.80.131:5000/api';
+
+        // 页面加载初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化国际化
+            if (window.i18nManager) {
+                window.i18nManager.applyLanguage();
+            }
+            loadSidebar();
+            loadSettings(); // 加载已保存的设置
+            // 绑定滑块值变化事件
+            bindRangeEvents();
+        });
+
+        // 绑定滑块值变化事件
+        function bindRangeEvents() {
+            const refreshInterval = document.getElementById('refreshInterval');
+            const cpuThreshold = document.getElementById('cpuThreshold');
+            const memThreshold = document.getElementById('memThreshold');
+
+            refreshInterval.addEventListener('input', function() {
+                document.getElementById('refreshIntervalValue').textContent = this.value;
+            });
+            cpuThreshold.addEventListener('input', function() {
+                document.getElementById('cpuThresholdValue').textContent = this.value;
+            });
+            memThreshold.addEventListener('input', function() {
+                document.getElementById('memThresholdValue').textContent = this.value;
+            });
+        }
+
+        // 加载已保存的设置
+        async function loadSettings() {
+            try {
+                const response = await fetch(`${API_BASE}/settings`);
+                if (!response.ok) throw new Error('获取设置失败');
+                const settings = await response.json();
+
+                // 填充设置值
+                document.getElementById('refreshInterval').value = settings.refresh_interval || 5;
+                document.getElementById('refreshIntervalValue').textContent = settings.refresh_interval || 5;
+                document.getElementById('cpuThreshold').value = settings.cpu_threshold || 80;
+                document.getElementById('cpuThresholdValue').textContent = settings.cpu_threshold || 80;
+                document.getElementById('memThreshold').value = settings.mem_threshold || 80;
+                document.getElementById('memThresholdValue').textContent = settings.mem_threshold || 80;
+                document.getElementById('theme').value = settings.theme || 'dark';
+                document.getElementById('dataRetention').value = settings.data_retention || 7;
+
+                // 应用主题（如果是浅色主题）
+                if (settings.theme === 'light') {
+                    applyLightTheme();
+                }
+            } catch (error) {
+                console.error('加载设置失败:', error);
+                // 使用默认值，不影响功能
+            }
+        }
+
+        // 保存设置
+        async function saveSettings() {
+            const settings = {
+                refresh_interval: parseInt(document.getElementById('refreshInterval').value),
+                cpu_threshold: parseInt(document.getElementById('cpuThreshold').value),
+                mem_threshold: parseInt(document.getElementById('memThreshold').value),
+                theme: document.getElementById('theme').value,
+                data_retention: parseInt(document.getElementById('dataRetention').value)
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/settings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+
+                if (!response.ok) throw new Error('保存设置失败');
+                // 显示成功提示
+                const saveSuccess = document.getElementById('saveSuccess');
+                saveSuccess.style.display = 'block';
+                setTimeout(() => saveSuccess.style.display = 'none', 3000);
+
+                // 应用主题切换
+                if (settings.theme === 'light') {
+                    applyLightTheme();
+                } else {
+                    applyDarkTheme();
+                }
+
+                // 通知其他页面刷新频率变化（可选）
+                window.localStorage.setItem('refreshInterval', settings.refresh_interval);
+            } catch (error) {
+                console.error('保存设置失败:', error);
+                showMessage('保存失败：' + error.message, 'error');
+            }
+        }
+
+        // 应用浅色主题
+        function applyLightTheme() {
+            document.body.style.backgroundColor = '#f8fafc';
+            document.body.style.color = '#1e293b';
+            // 可扩展：修改卡片、表格等样式
+        }
+
+        // 应用深色主题（默认）
+        function applyDarkTheme() {
+            document.body.style.backgroundColor = ''; // 恢复css默认样式
+            document.body.style.color = '';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>监控大屏 - 服务器系统</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- 引入图表库（用于展示CPU/内存趋势） -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 局部加载动画（不占表格空间） */
+        .inline-loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #4cc9f0;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: inline-spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+        @keyframes inline-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* 数据更新平滑过渡 */
+        .table td {
+            transition: all 0.3s ease;
+        }
+        /* 核心：数据更新时的闪烁动画（仅使用率等动态数据） */
+        .data-update {
+            animation: flash 0.5s ease-out;
+        }
+        @keyframes flash {
+            0% { background-color: rgba(251, 191, 36, 0.2); } /* 浅黄色高亮，不刺眼 */
+            100% { background-color: transparent; }
+        }
+        /* 状态标签样式（确保正常显示） */
+        .status-online {
+            color: #4ade80;
+            font-weight: 500;
+        }
+        .status-offline {
+            color: #f87171;
+        }
+        /* 告警样式 */
+        .alert-red {
+            color: #ef4444; /* 红色告警色 */
+            font-weight: bold;
+        }
+        .fa-exclamation-triangle {
+            margin-left: 5px;
+            color: #f59e0b; /* 黄色警告图标 */
+        }
+        /* 语言切换器样式 */
+        .language-switcher-top {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .language-switcher-top select {
+            padding: 8px 12px;
+            background: rgba(13, 27, 42, 0.7);
+            border: 1px solid #415a77;
+            border-radius: 4px;
+            color: #e0e1dd;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1 data-i18n="sidebar.system">服务器系统</h1>
+        </div>
+        <div class="sidebar-nav">
+            <a href="index.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-server"></i>
+                    <span data-i18n="sidebar.server_monitor">服务器监控</span>
+                </div>
+            </a>
+            <a href="dashboard.html" class="sidebar-nav-link">
+                <div class="sidebar-item active">
+                    <i class="fas fa-chart-pie"></i>
+                    <span data-i18n="sidebar.dashboard">监控大屏</span>
+                </div>
+            </a>
+            <a href="index.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-desktop"></i>
+                    <span data-i18n="sidebar.host_management">主机管理</span>
+                </div>
+            </a>
+            <a href="history.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-history"></i>
+                    <span data-i18n="sidebar.history">历史记录</span>
+                </div>
+            </a>
+            <a href="settings.html" class="sidebar-nav-link">
+                <div class="sidebar-item">
+                    <i class="fas fa-cog"></i>
+                    <span data-i18n="sidebar.settings">系统设置</span>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- 顶部语言切换器 -->
+    <div class="language-switcher-top">
+        <select id="languageSwitcherTop">
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+        </select>
+    </div>
+
+    <div class="content">
+        <div class="content-header">
+            <h2 data-i18n="dashboard.title">📊 监控大屏</h2>
+            <p class="subtitle" data-i18n="dashboard.subtitle">实时监控所有服务器状态</p>
+        </div>
+
+        <!-- 服务器状态概览卡片 -->
+        <div class="grid grid-3">
+            <div class="card">
+                <h3 data-i18n="dashboard.total_servers">总服务器数</h3>
+                <div style="font-size: 3em; font-weight: 300; color: #4cc9f0; margin: 20px 0;">
+                    <span id="totalHosts">0</span> <span data-i18n="dashboard.unit_servers">台</span>
+                </div>
+                <p style="color: #778da9;" data-i18n="dashboard.total_servers_desc">已添加的服务器总数</p>
+            </div>
+            <div class="card">
+                <h3 data-i18n="dashboard.running_normal">正常运行</h3>
+                <div style="font-size: 3em; font-weight: 300; color: #4ade80; margin: 20px 0;">
+                    <span id="onlineHosts">0</span> <span data-i18n="dashboard.unit_servers">台</span>
+                </div>
+                <p style="color: #778da9;" data-i18n="dashboard.running_normal_desc">SSH连接正常的服务器</p>
+            </div>
+            <div class="card">
+                <h3 data-i18n="dashboard.avg_cpu_usage">平均CPU使用率</h3>
+                <div style="font-size: 3em; font-weight: 300; color: #fbbf24; margin: 20px 0;">
+                    <span id="avgCpu">0.0</span>%
+                </div>
+                <p style="color: #778da9;" data-i18n="dashboard.avg_cpu_usage_desc">所有服务器CPU平均负载</p>
+            </div>
+        </div>
+
+        <!-- 图表区域（CPU/内存趋势） -->
+        <div class="grid grid-2">
+            <div class="card">
+                <h3 data-i18n="dashboard.cpu_trend">CPU使用率趋势</h3>
+                <div class="chart-container">
+                    <canvas id="cpuChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h3 data-i18n="dashboard.memory_trend">内存使用率趋势</h3>
+                <div class="chart-container">
+                    <canvas id="memChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 服务器详细状态表（优化后：仅数据闪烁，表格不闪） -->
+        <div class="card">
+            <h3 data-i18n="dashboard.server_status">服务器详细状态</h3>
+            <div style="margin-bottom: 15px;">
+                <button onclick="refreshDashboard()" class="btn btn-success" id="refreshStatusBtn">
+                    🔄 <span data-i18n="host_management.refresh_data">刷新数据</span>
+                </button>
+            </div>
+            <div id="hostsStatusContainer">
+                <!-- 初始加载状态（首次加载显示） -->
+                <div id="initialLoading" style="text-align: center; padding: 40px; display: block;">
+                    <div class="loading" style="margin: 0 auto;"></div>
+                    <p style="margin-top: 15px; color: #778da9;" data-i18n="host_management.loading">加载中...</p>
+                </div>
+                <!-- 空状态（无数据时显示） -->
+                <div id="emptyStatus" style="text-align: center; padding: 40px; color: #778da9; display: none;">
+                    <div style="font-size: 3em; margin-bottom: 15px;">🖥️</div>
+                    <p data-i18n="host_management.no_hosts">暂无服务器数据，请先添加主机</p>
+                </div>
+                <!-- 表格容器（有数据时显示，表头永久保留） -->
+                <div id="tableWrapper" style="display: none;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="table.ip">IP地址</th>
+                                <th data-i18n="table.username">用户名</th>
+                                <th data-i18n="table.ssh_port">SSH端口</th>
+                                <th data-i18n="table.cpu_usage">CPU使用率</th>
+                                <th data-i18n="table.memory_usage">内存使用率</th>
+                                <th data-i18n="table.disk_usage">磁盘使用率</th>
+                                <th data-i18n="table.status">状态</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statusTableBody">
+                            <!-- 数据行动态更新，仅单元格内容变化 -->
+                        </tbody>
+                    </table>
+                </div>
+                <!-- 错误提示容器 -->
+                <div id="errorStatus" style="display: none;" class="alert alert-danger"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加语言包引用 -->
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/index.js"></script>
+
+    <!-- 加载UI工具库和图表管理 -->
+    <script src="js/ui.js"></script>
+    <script src="js/charts.js"></script>
+
+    <script>
+        // 全局变量
+        let cpuChart = null;
+        let memChart = null;
+        const API_BASE = 'http://192.168.80.131:5000/api';
+        const chartData = {
+            labels: [], // 时间轴标签
+            cpuData: {}, // 各主机CPU数据
+            memData: {}  // 各主机内存数据
+        };
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 监控大屏页面开始初始化...');
+            
+            // 初始化国际化
+            if (window.i18nManager) {
+                console.log('🌐 初始化国际化管理器');
+                window.i18nManager.applyLanguage();
+                // 设置语言切换器当前值
+                document.getElementById('languageSwitcherTop').value = window.i18nManager.getCurrentLanguage();
+            }
+            
+            // 添加语言切换事件监听
+            document.getElementById('languageSwitcherTop').addEventListener('change', function() {
+                if (window.switchLanguage) {
+                    window.switchLanguage(this.value);
+                }
+            });
+            
+            // 修复侧边栏高亮（不重新加载整个侧边栏）
+            if (window.fixSidebarHighlight) {
+                window.fixSidebarHighlight();
+            }
+            
+            console.log('✅ 侧边栏修复完成');
+            
+            // 延迟初始化图表，确保DOM完全加载
+            setTimeout(() => {
+                initCharts();  // 初始化图表
+                refreshDashboard(); // 加载初始数据
+            }, 100);
+            
+            // 自动刷新（5秒一次）
+            setInterval(refreshDashboard, 5000);
+            console.log('🔄 自动刷新定时器已启动');
+        });
+
+        /**
+         * 初始化图表 - 使用安全的初始化方式
+         */
+        function initCharts() {
+            console.log('📊 开始初始化图表...');
+            
+            try {
+                // 初始化CPU图表
+                const cpuCanvas = document.getElementById('cpuChart');
+                if (cpuCanvas) {
+                    const cpuCtx = cpuCanvas.getContext('2d');
+                    cpuChart = new Chart(cpuCtx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: []
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { 
+                                    display: true,
+                                    labels: { color: '#e0e1dd' }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    display: true,
+                                    grid: { color: 'rgba(65, 90, 119, 0.3)' },
+                                    ticks: { color: '#a8b5c5' }
+                                },
+                                y: {
+                                    display: true,
+                                    min: 0,
+                                    max: 100,
+                                    grid: { color: 'rgba(65, 90, 119, 0.3)' },
+                                    ticks: { 
+                                        color: '#a8b5c5', 
+                                        callback: function(value) {
+                                            return value + '%';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    console.log('✅ CPU图表初始化成功');
+                } else {
+                    console.warn('⚠️ CPU图表容器未找到');
+                }
+
+                // 初始化内存图表
+                const memCanvas = document.getElementById('memChart');
+                if (memCanvas) {
+                    const memCtx = memCanvas.getContext('2d');
+                    memChart = new Chart(memCtx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: []
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { 
+                                    display: true,
+                                    labels: { color: '#e0e1dd' }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    display: true,
+                                    grid: { color: 'rgba(65, 90, 119, 0.3)' },
+                                    ticks: { color: '#a8b5c5' }
+                                },
+                                y: {
+                                    display: true,
+                                    min: 0,
+                                    max: 100,
+                                    grid: { color: 'rgba(65, 90, 119, 0.3)' },
+                                    ticks: { 
+                                        color: '#a8b5c5',
+                                        callback: function(value) {
+                                            return value + '%';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    console.log('✅ 内存图表初始化成功');
+                } else {
+                    console.warn('⚠️ 内存图表容器未找到');
+                }
+                
+                console.log('✅ 图表初始化完成');
+            } catch (error) {
+                console.error('❌ 图表初始化失败:', error);
+            }
+        }
+
+        /**
+         * 刷新监控大屏数据
+         */
+        async function refreshDashboard() {
+            console.log('🔄 开始刷新监控数据...');
+            
+            const refreshBtn = document.getElementById('refreshStatusBtn');
+            const initialLoading = document.getElementById('initialLoading');
+            const emptyStatus = document.getElementById('emptyStatus');
+            const tableWrapper = document.getElementById('tableWrapper');
+            const statusTableBody = document.getElementById('statusTableBody');
+            const errorStatus = document.getElementById('errorStatus');
+
+            // 刷新按钮状态处理
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<div class="inline-loading"></div> <span data-i18n="host_management.refreshing">刷新中...</span>';
+
+            // 隐藏所有状态容器，按需显示
+            initialLoading.style.display = 'none';
+            emptyStatus.style.display = 'none';
+            errorStatus.style.display = 'none';
+
+            try {
+                console.log('📡 请求主机数据...');
+                // 获取最新主机数据
+                const response = await fetch(`${API_BASE}/hosts`);
+                if (!response.ok) throw new Error('获取数据失败');
+                const hosts = await response.json();
+                console.log('✅ 获取到主机数据:', hosts);
+
+                // 获取告警阈值
+                const settingsResp = await fetch(`${API_BASE}/settings`);
+                const settings = await settingsResp.json();
+                const cpuThreshold = settings.cpu_threshold;
+                const memThreshold = settings.mem_threshold;
+
+                // 更新概览统计
+                updateOverviewStats(hosts);
+
+                // 更新图表数据
+                updateChartsData(hosts);
+
+                // 更新服务器详细状态表
+                if (!hosts || hosts.length === 0) {
+                    // 无数据：显示空状态
+                    emptyStatus.style.display = 'block';
+                    tableWrapper.style.display = 'none';
+                    console.log('ℹ️ 无主机数据，显示空状态');
+                } else {
+                    // 有数据：显示表格，隐藏其他状态
+                    tableWrapper.style.display = 'block';
+                    emptyStatus.style.display = 'none';
+
+                    // 1. 构建主机IP映射（方便快速查询）
+                    const hostIpMap = new Map();
+                    hosts.forEach(host => hostIpMap.set(host.ip, host));
+
+                    // 2. 获取现有表格行，更新已有主机的数据（仅动态字段）
+                    const existingRows = statusTableBody.querySelectorAll('tr');
+                    const existingIps = new Set();
+
+                    existingRows.forEach(row => {
+                        const ip = row.cells[0].textContent.trim(); // 从IP单元格获取唯一标识
+                        const host = hostIpMap.get(ip);
+                        if (host) {
+                            existingIps.add(ip);
+
+                            // 解析使用率数值
+                            const cpu = parseFloat(host.cpu.replace('%', ''));
+                            const mem = parseFloat(host.mem.replace('%', ''));
+                            const cpuAlert = cpu > cpuThreshold;
+                            const memAlert = mem > memThreshold;
+
+                            // 更新CPU使用率
+                            const cpuCell = row.cells[3];
+                            if (cpuCell.textContent !== host.cpu) {
+                                cpuCell.textContent = host.cpu;
+                                cpuCell.className = cpuAlert ? 'alert-red' : '';
+                                cpuCell.innerHTML = `${host.cpu} ${cpuAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}`;
+                                cpuCell.classList.add('data-update');
+                                setTimeout(() => cpuCell.classList.remove('data-update'), 500);
+                            } else {
+                                cpuCell.className = cpuAlert ? 'alert-red' : '';
+                                cpuCell.innerHTML = `${host.cpu} ${cpuAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}`;
+                            }
+
+                            // 更新内存使用率
+                            const memCell = row.cells[4];
+                            if (memCell.textContent !== host.mem) {
+                                memCell.textContent = host.mem;
+                                memCell.className = memAlert ? 'alert-red' : '';
+                                memCell.innerHTML = `${host.mem} ${memAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}`;
+                                memCell.classList.add('data-update');
+                                setTimeout(() => memCell.classList.remove('data-update'), 500);
+                            } else {
+                                memCell.className = memAlert ? 'alert-red' : '';
+                                memCell.innerHTML = `${host.mem} ${memAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}`;
+                            }
+
+                            // 磁盘使用率
+                            const diskCell = row.cells[5];
+                            const newDisk = host.disk || '0.0%';
+                            if (diskCell.textContent !== newDisk) {
+                                diskCell.textContent = newDisk;
+                                diskCell.classList.add('data-update');
+                                setTimeout(() => diskCell.classList.remove('data-update'), 500);
+                            }
+
+                            // 在线状态
+                            const statusCell = row.cells[6];
+                            const isOnline = cpu > 0 || mem > 0;
+                            const newStatusText = isOnline ? 
+                                (window.i18nManager ? window.i18nManager.t('status.online') : '在线') : 
+                                (window.i18nManager ? window.i18nManager.t('status.offline') : '离线');
+                            const newStatusClass = isOnline ? 'status-online' : 'status-offline';
+                            
+                            if (statusCell.textContent !== newStatusText) {
+                                statusCell.textContent = newStatusText;
+                                statusCell.className = newStatusClass;
+                                statusCell.classList.add('data-update');
+                                setTimeout(() => statusCell.classList.remove('data-update'), 500);
+                            }
+                        }
+                    });
+
+                    // 3. 添加新主机行（首次出现的主机）
+                    hosts.forEach(host => {
+                        const ip = host.ip;
+                        if (!existingIps.has(ip)) {
+                            const cpu = parseFloat(host.cpu) || 0;
+                            const mem = parseFloat(host.mem) || 0;
+                            const isOnline = cpu > 0 || mem > 0;
+                            const statusClass = isOnline ? 'status-online' : 'status-offline';
+                            const statusText = isOnline ? 
+                                (window.i18nManager ? window.i18nManager.t('status.online') : '在线') : 
+                                (window.i18nManager ? window.i18nManager.t('status.offline') : '离线');
+                            const cpuAlert = cpu > cpuThreshold;
+                            const memAlert = mem > memThreshold;
+
+                            const newRow = document.createElement('tr');
+                            newRow.innerHTML = `
+                                <td>${host.ip}</td>
+                                <td>${host.username}</td>
+                                <td>${host.port || 22}</td>
+                                <td class="${cpuAlert ? 'alert-red' : ''}">
+                                    ${host.cpu} ${cpuAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}
+                                </td>
+                                <td class="${memAlert ? 'alert-red' : ''}">
+                                    ${host.mem} ${memAlert ? '<i class="fas fa-exclamation-triangle"></i>' : ''}
+                                </td>
+                                <td>${host.disk || '0.0%'}</td>
+                                <td class="${statusClass}">${statusText}</td>
+                            `;
+                            statusTableBody.appendChild(newRow);
+                        }
+                    });
+
+                    // 4. 移除已删除的主机行
+                    existingRows.forEach(row => {
+                        const ip = row.cells[0].textContent.trim();
+                        if (!hostIpMap.has(ip)) {
+                            row.remove();
+                        }
+                    });
+                    
+                    console.log('✅ 表格数据更新完成');
+                }
+
+            } catch (error) {
+                console.error('❌ 刷新监控大屏失败:', error);
+                // 错误状态：显示错误提示
+                errorStatus.style.display = 'block';
+                errorStatus.innerHTML = `❌ 加载数据失败：${error.message}`;
+                // 若已有表格，保留表格框架
+                if (statusTableBody.querySelectorAll('tr').length > 0) {
+                    tableWrapper.style.display = 'block';
+                }
+            } finally {
+                // 恢复刷新按钮状态
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '🔄 <span data-i18n="host_management.refresh_data">刷新数据</span>';
+                
+                // 重新应用语言
+                if (window.i18nManager) {
+                    window.i18nManager.applyLanguage();
+                }
+                
+                console.log('✅ 数据刷新完成');
+            }
+        }
+
+        /**
+         * 更新概览统计数据
+         */
+        function updateOverviewStats(hosts) {
+            const totalHosts = hosts.length;
+            const onlineHosts = hosts.filter(host => {
+                const cpu = parseFloat(host.cpu) || 0;
+                const mem = parseFloat(host.mem) || 0;
+                return cpu > 0 || mem > 0;
+            }).length;
+
+            const totalCpu = hosts.reduce((sum, host) => {
+                return sum + (parseFloat(host.cpu) || 0);
+            }, 0);
+            const avgCpu = totalHosts > 0 ? (totalCpu / totalHosts).toFixed(1) : '0.0';
+
+            document.getElementById('totalHosts').textContent = totalHosts;
+            document.getElementById('onlineHosts').textContent = onlineHosts;
+            document.getElementById('avgCpu').textContent = avgCpu;
+            
+            console.log(`📊 概览统计: 总数=${totalHosts}, 在线=${onlineHosts}, 平均CPU=${avgCpu}%`);
+        }
+
+        /**
+         * 更新图表数据
+         */
+        function updateChartsData(hosts) {
+            console.log('📈 开始更新图表数据...');
+            
+            if (!cpuChart || !memChart) {
+                console.warn('⚠️ 图表未初始化，跳过更新');
+                return;
+            }
+
+            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            // 确保labels数组存在
+            if (!chartData.labels) chartData.labels = [];
+            if (!chartData.cpuData) chartData.cpuData = {};
+            if (!chartData.memData) chartData.memData = {};
+
+            // 限制数据点数量
+            if (chartData.labels.length > 10) {
+                chartData.labels.shift();
+            }
+            chartData.labels.push(now);
+
+            // 处理每个主机的数据
+            hosts.forEach(host => {
+                const ip = host.ip;
+                
+                // 初始化数据数组
+                if (!chartData.cpuData[ip]) {
+                    chartData.cpuData[ip] = [];
+                }
+                if (!chartData.memData[ip]) {
+                    chartData.memData[ip] = [];
+                }
+
+                // 限制数据点数量
+                if (chartData.cpuData[ip].length > 10) {
+                    chartData.cpuData[ip].shift();
+                }
+                if (chartData.memData[ip].length > 10) {
+                    chartData.memData[ip].shift();
+                }
+
+                // 添加新数据（确保是数字）
+                const cpuValue = parseFloat(host.cpu) || 0;
+                const memValue = parseFloat(host.mem) || 0;
+                
+                chartData.cpuData[ip].push(cpuValue);
+                chartData.memData[ip].push(memValue);
+            });
+
+            const colors = [
+                '#4361ee', '#4cc9f0', '#f72585', '#b5179e', '#7209b7',
+                '#3a0ca3', '#4ade80', '#fbbf24', '#f87171', '#94a3b8'
+            ];
+
+            try {
+                // 更新CPU图表
+                cpuChart.data.labels = [...chartData.labels];
+                cpuChart.data.datasets = Object.entries(chartData.cpuData).map(([ip, data], index) => ({
+                    label: ip,
+                    data: data,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: `${colors[index % colors.length]}20`,
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: false
+                }));
+                cpuChart.update();
+                console.log('✅ CPU图表更新完成');
+
+                // 更新内存图表
+                memChart.data.labels = [...chartData.labels];
+                memChart.data.datasets = Object.entries(chartData.memData).map(([ip, data], index) => ({
+                    label: ip,
+                    data: data,
+                    borderColor: colors[(index + 3) % colors.length],
+                    backgroundColor: `${colors[(index + 3) % colors.length]}20`,
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: false
+                }));
+                memChart.update();
+                console.log('✅ 内存图表更新完成');
+            } catch (error) {
+                console.error('❌ 更新图表数据失败:', error);
+            }
+        }
+    </script>
+</body>
+</html>
